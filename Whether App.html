@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Enhanced Weather App</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #74ebd5, #9face6, #ff9a9e); /* Enhanced gradient with more colors */
+      height: 100vh;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #333;
+      overflow: hidden; /* Prevent scroll from animations */
+      position: relative; /* For positioning circles */
+    }
+    .weather-container {
+      background: rgba(255, 255, 255, 0.9); /* Semi-transparent for better blend */
+      padding: 2rem 3rem;
+      border-radius: 20px; /* Softer corners */
+      box-shadow: 0 15px 30px rgba(0,0,0,0.2); /* Deeper shadow for depth */
+      text-align: center;
+      width: 350px; /* Slightly wider for better layout */
+      z-index: 2; /* Above circles */
+      animation: fadeIn 1s ease-in-out; /* Fade-in animation for container */
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    button {
+      padding: 12px 24px;
+      background: linear-gradient(to right, #4a90e2, #50c9c3); /* Gradient button */
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s ease, transform 0.2s;
+      margin-top: 1rem;
+    }
+    button:hover {
+      background: linear-gradient(to right, #357ABD, #3baea8);
+      transform: scale(1.05); /* Slight zoom on hover */
+    }
+    .result {
+      margin-top: 1rem;
+      animation: slideUp 0.8s ease-out; /* Slide-up animation for results */
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .error {
+      color: #ff4757; /* Brighter red for errors */
+      margin-top: 1rem;
+      animation: shake 0.5s; /* Shake animation for errors */
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+    input[type="text"] {
+      padding: 10px;
+      width: 85%;
+      margin-top: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      transition: border 0.3s;
+    }
+    input[type="text"]:focus {
+      border: 1px solid #4a90e2; /* Highlight on focus */
+      outline: none;
+    }
+    h3 {
+      color: #2f3542; /* Darker color for city name */
+      margin-bottom: 1rem;
+    }
+    p strong {
+      color: #57606f; /* Subtle color for labels */
+    }
+    /* Temperature color coding */
+    .temp-hot { color: #ff4757; } /* Red for hot */
+    .temp-warm { color: #ffa502; } /* Orange for warm */
+    .temp-cool { color: #1e90ff; } /* Blue for cool */
+    .temp-cold { color: #3742fa; } /* Dark blue for cold */
+
+    /* Loading spinner */
+    .loading::after {
+      content: '';
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #3498db;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-left: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Moving circles background */
+    .circle {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3); /* Semi-transparent white */
+      animation: float 15s infinite ease-in-out;
+      z-index: 1; /* Behind the container */
+    }
+    .circle:nth-child(1) {
+      width: 100px; height: 100px; top: 10%; left: 20%; animation-duration: 20s; animation-delay: 0s;
+    }
+    .circle:nth-child(2) {
+      width: 150px; height: 150px; top: 30%; left: 50%; animation-duration: 25s; animation-delay: 5s;
+    }
+    .circle:nth-child(3) {
+      width: 80px; height: 80px; top: 60%; left: 70%; animation-duration: 18s; animation-delay: 10s;
+    }
+    .circle:nth-child(4) {
+      width: 120px; height: 120px; top: 80%; left: 10%; animation-duration: 22s; animation-delay: 15s;
+    }
+    .circle:nth-child(5) {
+      width: 90px; height: 90px; top: 50%; left: 80%; animation-duration: 28s; animation-delay: 2s;
+    }
+    @keyframes float {
+      0% { transform: translateY(0) translateX(0); opacity: 0.8; }
+      50% { transform: translateY(-50px) translateX(20px); opacity: 0.4; }
+      100% { transform: translateY(0) translateX(0); opacity: 0.8; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Moving circles -->
+  <div class="circle"></div>
+  <div class="circle"></div>
+  <div class="circle"></div>
+  <div class="circle"></div>
+  <div class="circle"></div>
+
+  <div class="weather-container">
+    <h2>Current Weather</h2>
+    <input type="text" id="cityInput" placeholder="Enter city name (e.g., London)" />
+    <button onclick="getWeatherByCity()">Get Weather by City</button>
+    <div class="result" id="result">Fetching location and weather...</div>
+    <div class="error" id="error"></div>
+    <button onclick="getLocation()">Refresh Location & Weather</button>
+  </div>
+
+  <script>
+    // No API key required! Using Open-Meteo (free) for weather and Nominatim for location names.
+
+    const weatherCodes = {
+      0: 'Clear sky',
+      1: 'Mainly clear',
+      2: 'Partly cloudy',
+      3: 'Overcast',
+      45: 'Fog',
+      48: 'Depositing rime fog',
+      51: 'Light drizzle',
+      53: 'Moderate drizzle',
+      55: 'Dense drizzle',
+      56: 'Light freezing drizzle',
+      57: 'Dense freezing drizzle',
+      61: 'Slight rain',
+      63: 'Moderate rain',
+      65: 'Heavy rain',
+      66: 'Light freezing rain',
+      67: 'Heavy freezing rain',
+      71: 'Slight snow fall',
+      73: 'Moderate snow fall',
+      75: 'Heavy snow fall',
+      77: 'Snow grains',
+      80: 'Slight rain showers',
+      81: 'Moderate rain showers',
+      82: 'Violent rain showers',
+      85: 'Slight snow showers',
+      86: 'Heavy snow showers',
+      95: 'Thunderstorm',
+      96: 'Thunderstorm with slight hail',
+      99: 'Thunderstorm with heavy hail'
+    };
+
+    function getWeatherDescription(code) {
+      return weatherCodes[code] || 'Unknown';
+    }
+
+    function getTempClass(temp) {
+      if (temp > 30) return 'temp-hot';
+      if (temp > 20) return 'temp-warm';
+      if (temp > 10) return 'temp-cool';
+      return 'temp-cold';
+    }
+
+    async function getWeatherData(lat, lon) {
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&wind_speed_unit=ms`;
+      const response = await fetch(weatherUrl);
+      if (!response.ok) {
+        throw new Error('Failed to fetch weather data');
+      }
+      const data = await response.json();
+      return data.current;
+    }
+
+    async function getCityFromCoords(lat, lon) {
+      const reverseUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&zoom=10`;
+      const response = await fetch(reverseUrl);
+      if (!response.ok) {
+        throw new Error('Failed to fetch location name');
+      }
+      const data = await response.json();
+      const address = data.address;
+      const city = address.city || address.town || address.village || address.hamlet || 'Unknown Location';
+      const country = address.country || '';
+      return { city, country };
+    }
+
+    async function getWeatherByCoords(lat, lon) {
+      const resultDiv = document.getElementById('result');
+      const errorDiv = document.getElementById('error');
+      errorDiv.textContent = '';
+      resultDiv.classList.add('loading');
+      resultDiv.innerHTML = 'Loading weather data...';
+
+      try {
+        const [location, weather] = await Promise.all([
+          getCityFromCoords(lat, lon),
+          getWeatherData(lat, lon)
+        ]);
+
+        const cityName = location.city;
+        const country = location.country;
+        const temp = weather.temperature_2m;
+        const description = getWeatherDescription(weather.weather_code);
+        const humidity = weather.relative_humidity_2m;
+        const windSpeed = weather.wind_speed_10m;
+        const tempClass = getTempClass(temp);
+
+        resultDiv.innerHTML = `
+          <h3>${cityName}${country ? ', ' + country : ''}</h3>
+          <p><strong>Temperature:</strong> <span class="${tempClass}">${temp} &deg;C</span></p>
+          <p><strong>Condition:</strong> ${description}</p>
+          <p><strong>Humidity:</strong> ${humidity}%</p>
+          <p><strong>Wind Speed:</strong> ${windSpeed} m/s</p>
+        `;
+      } catch (error) {
+        resultDiv.innerHTML = '';
+        errorDiv.textContent = error.message;
+      } finally {
+        resultDiv.classList.remove('loading');
+      }
+    }
+
+    async function getWeatherByCity() {
+      const city = document.getElementById('cityInput').value.trim();
+      const resultDiv = document.getElementById('result');
+      const errorDiv = document.getElementById('error');
+      errorDiv.textContent = '';
+      resultDiv.classList.add('loading');
+      resultDiv.innerHTML = 'Loading weather data...';
+
+      if (!city) {
+        errorDiv.textContent = 'Please enter a city name (e.g., London)';
+        resultDiv.innerHTML = '';
+        resultDiv.classList.remove('loading');
+        return;
+      }
+
+      try {
+        const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en`;
+        const geoResponse = await fetch(geoUrl);
+        if (!geoResponse.ok) {
+          throw new Error('Failed to find city');
+        }
+        const geoData = await geoResponse.json();
+        if (!geoData.results || geoData.results.length === 0) {
+          throw new Error('City not found. Try another city.');
+        }
+        const location = geoData.results[0];
+        const lat = location.latitude;
+        const lon = location.longitude;
+        const cityName = location.name;
+        const country = location.country || '';
+
+        const weather = await getWeatherData(lat, lon);
+
+        const temp = weather.temperature_2m;
+        const description = getWeatherDescription(weather.weather_code);
+        const humidity = weather.relative_humidity_2m;
+        const windSpeed = weather.wind_speed_10m;
+        const tempClass = getTempClass(temp);
+
+        resultDiv.innerHTML = `
+          <h3>${cityName}${country ? ', ' + country : ''}</h3>
+          <p><strong>Temperature:</strong> <span class="${tempClass}">${temp} &deg;C</span></p>
+          <p><strong>Condition:</strong> ${description}</p>
+          <p><strong>Humidity:</strong> ${humidity}%</p>
+          <p><strong>Wind Speed:</strong> ${windSpeed} m/s</p>
+        `;
+      } catch (error) {
+        resultDiv.innerHTML = '';
+        errorDiv.textContent = error.message;
+      } finally {
+        resultDiv.classList.remove('loading');
+      }
+    }
+
+    function getLocation() {
+      const resultDiv = document.getElementById('result');
+      const errorDiv = document.getElementById('error');
+      resultDiv.classList.add('loading');
+      resultDiv.textContent = 'Getting your location...';
+      errorDiv.textContent = '';
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            getWeatherByCoords(lat, lon);
+          },
+          (error) => {
+            let errorMsg = 'An unknown error occurred. Try entering a city name.';
+            switch(error.code) {
+              case error.PERMISSION_DENIED:
+                errorMsg = "User denied the request for Geolocation. Try entering a city name.";
+                break;
+              case error.POSITION_UNAVAILABLE:
+                errorMsg = "Location information is unavailable. Try entering a city name.";
+                break;
+              case error.TIMEOUT:
+                errorMsg = "The request to get user location timed out. Try entering a city name.";
+                break;
+            }
+            errorDiv.textContent = errorMsg;
+            resultDiv.textContent = '';
+            resultDiv.classList.remove('loading');
+          }
+        );
+      } else {
+        errorDiv.textContent = "Geolocation is not supported by this browser. Try entering a city name.";
+        resultDiv.textContent = '';
+        resultDiv.classList.remove('loading');
+      }
+    }
+
+    // Auto-load weather on page load
+    window.onload = getLocation;
+  </script>
+</body>
+</html>
