@@ -79,6 +79,10 @@ Improve mobile responsiveness and accessibility compliance.
 Contribution
 Contributions are welcome! Feel free to open issues or submit pull requests to improve the app.
 
+Developer:
+Developed By Mayank Singh 
+
+
 License
 This project is open source under the MIT License.
 
